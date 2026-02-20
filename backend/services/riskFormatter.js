@@ -1,6 +1,9 @@
-function combine(ruleRisks, aiRisks) {
+function combine(ruleRisks, aiResult) {
   return {
-    risks: [...ruleRisks, ...aiRisks],
+    risks: [
+      ...ruleRisks,
+      ...(aiResult?.risks || [])
+    ]
   };
 }
 
