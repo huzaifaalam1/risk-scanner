@@ -1,41 +1,22 @@
 const express = require("express");
-const multer = require("multer");
 
-const pdfService = require("../services/pdfService");
 const geminiService = require("../services/geminiService");
-const ruleEngine = require("../services/ruleEngine");
-const riskFormatter = require("../services/riskFormatter");
 
 const router = express.Router();
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
-});
-
-router.post("/", upload.single("file"), async (req, res) => {
+router.post("/", async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
+    const contractText = `
+This agreement will automatically renew for successive one-year terms unless either party provides written notice of termination at least 90 days before the renewal date.
+The client agrees to indemnify and hold harmless the vendor against any and all claims.
+The vendor may terminate this agreement at its sole discretion at any time.
+`;
 
-    // 1. Extract text
-    const contractText = await pdfService.extractText(req.file.buffer);
-
-    // 2. Rule-based risks
-    const ruleRisks = ruleEngine.detectRisks(contractText);
-
-    // 3. AI risks
-    const aiRisks = await geminiService.analyze(contractText);
-
-    // 4. Merge + format
-    const finalResult = riskFormatter.combine(ruleRisks, aiRisks);
-
-    res.json(finalResult);
-
+    const aiResult = await geminiService.analyze(contractText);
+    return res.json(aiResult);
   } catch (error) {
     console.error("Analyze Route Error:", error);
-    res.status(500).json({ error: "Contract analysis failed" });
+    return res.status(500).json({ error: "Contract analysis failed" });
   }
 });
 
