@@ -6,12 +6,13 @@ interface Risk {
 }
 
 export default function RiskCard({ risk }: { risk: Risk }) {
+    console.log("RiskCard rendering:", risk);
     const color =
-        risk.riskLevel === "High"
-        ? "bg-red-100 border-red-400"
+    risk.riskLevel === "High"
+        ? "bg-red-600 text-white border-red-800"
         : risk.riskLevel === "Medium"
-        ? "bg-yellow-100 border-yellow-400"
-        : "bg-green-100 border-green-400";
+        ? "bg-yellow-500 text-black border-yellow-700"
+        : "bg-green-600 text-white border-green-800";
 
     return (
         <div className={`border-l-4 p-5 rounded-xl ${color}`}>

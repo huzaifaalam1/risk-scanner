@@ -4,6 +4,7 @@ interface ContractSummaryProps {
 
 
 export default function ContractSummary({ summary }: ContractSummaryProps) {
+    console.log("ContractSummary received:", summary);
     if (!summary) return null;
 
 

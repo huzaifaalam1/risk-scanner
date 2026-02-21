@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useState } from "react";
 import axios from "axios";
 import FileUpload from "./components/FileUpload";
@@ -9,14 +8,12 @@ import RiskSummary from "./components/RiskSummary";
 import ContractSummary from "./components/ContractSummary";
 import jsPDF from "jspdf";
 
-
 interface Risk {
   category: string;
   riskLevel: string;
   clause: string;
   explanation: string;
 }
-
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -25,44 +22,48 @@ export default function Home() {
   const [summary, setSummary] = useState<string>("");
   const [filter, setFilter] = useState<"All" | "High" | "Medium" | "Low">("All");
 
-
-  // Analyze uploaded file
   const handleAnalyze = async () => {
     if (!file) return;
-
 
     const formData = new FormData();
     formData.append("file", file);
 
-
     try {
       setLoading(true);
 
+      const response = await axios.post(
+        "http://localhost:5000/analyze",
+        formData
+      );
 
-      const response = await axios.post("http://localhost:5000/analyze", formData);
-
-
-      let parsed;
-      if (typeof response.data.analysis === "string") {
-        // Fallback: wrap raw string in a Risk object
-        parsed = {
-          summary: response.data.analysis,
-          risks: [
-            {
-              category: "AI Output",
-              riskLevel: "Info",
-              clause: "",
-              explanation: response.data.analysis,
-            },
-          ],
-        };
-      } else {
-        parsed = response.data.analysis;
+      const analysis = response.data
+      console.log("FULL RESPONSE:", response.data);
+      console.log("ANALYSIS VALUE:", analysis);
+      if (!analysis) {
+        setSummary("No AI response received.");
+        setRisks([]);
+        return;
       }
 
+      setSummary(analysis.summary || "");
+      setRisks(analysis.risks || []);
 
-      setRisks(parsed.risks || []);
-      setSummary(parsed.summary || "");
+      // If backend returns plain text (current implementation)
+      if (typeof analysis === "string") {
+        setSummary(analysis);
+        setRisks([
+          {
+            category: "AI Output",
+            riskLevel: "Low",
+            clause: "",
+            explanation: analysis,
+          },
+        ]);
+      } else {
+        // If in future you return structured JSON
+        setRisks(analysis.risks || []);
+        setSummary(analysis.summary || "");
+      }
     } catch (error) {
       console.error(error);
       alert("Analysis failed. Check backend.");
@@ -71,11 +72,11 @@ export default function Home() {
     }
   };
 
-
-  // Download JSON
   const downloadJSON = () => {
     const data = { summary, risks };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -84,46 +85,46 @@ export default function Home() {
     URL.revokeObjectURL(url);
   };
 
-
-  // Download PDF
   const downloadPDF = () => {
     const doc = new jsPDF();
 
-
     doc.setFontSize(16);
     doc.text("Contract Executive Summary", 10, 20);
+
     doc.setFontSize(12);
-    doc.text(summary || "No summary available", 10, 30);
-
-
-    doc.setFontSize(16);
-    doc.text("Risk Summary", 10, 50);
-
-
-    risks.forEach((risk, i) => {
-      const y = 60 + i * 20;
-      doc.setFontSize(12);
-      doc.text(`${i + 1}. ${risk.category} — ${risk.riskLevel}`, 10, y);
-      doc.setFontSize(10);
-      doc.text(`Clause: ${risk.clause}`, 10, y + 5);
-      doc.text(`Explanation: ${risk.explanation}`, 10, y + 10);
+    doc.text(summary || "No summary available", 10, 30, {
+      maxWidth: 180,
     });
 
+    let yOffset = 50;
+
+    doc.setFontSize(16);
+    doc.text("Risk Details", 10, yOffset);
+    yOffset += 10;
+
+    risks.forEach((risk, i) => {
+      doc.setFontSize(12);
+      doc.text(`${i + 1}. ${risk.category} — ${risk.riskLevel}`, 10, yOffset);
+      yOffset += 6;
+
+      doc.setFontSize(10);
+      doc.text(`Explanation: ${risk.explanation}`, 10, yOffset, {
+        maxWidth: 180,
+      });
+      yOffset += 12;
+    });
 
     doc.save("contract_risks.pdf");
   };
 
-
   return (
     <main className="min-h-screen p-10 max-w-4xl mx-auto">
-      <h1 className="text-4xl font-bold mb-8 text-center w-full">AI Contract Risk Scanner</h1>
+      <h1 className="text-4xl font-bold mb-8 text-center">
+        AI Contract Risk Scanner
+      </h1>
 
-
-      {/* File Upload */}
       <FileUpload onFileSelect={setFile} />
 
-
-      {/* Analyze Button */}
       {file && (
         <button
           onClick={handleAnalyze}
@@ -133,8 +134,6 @@ export default function Home() {
         </button>
       )}
 
-
-      {/* Download Buttons */}
       <div className="mt-4 flex gap-4">
         <button
           onClick={downloadJSON}
@@ -150,22 +149,23 @@ export default function Home() {
         </button>
       </div>
 
+      {loading && (
+        <p className="mt-6 animate-pulse text-gray-600">
+          AI is analyzing your contract for risk exposure...
+        </p>
+      )}
 
-      {/* Loading */}
-      {loading && <p className="mt-6">Analyzing contract...</p>}
-
-
-      {/* Filter + Results */}
-      {risks.length > 0 && (
+      {(summary || risks.length > 0) && (
         <div className="mt-10 space-y-6">
-          {/* Filter Buttons */}
           <div className="flex gap-4 mb-4">
             {["All", "High", "Medium", "Low"].map((level) => (
               <button
                 key={level}
                 onClick={() => setFilter(level as any)}
                 className={`px-4 py-2 rounded-lg font-medium ${
-                  filter === level ? "bg-black text-white" : "bg-gray-200 text-black"
+                  filter === level
+                    ? "bg-black text-white"
+                    : "bg-gray-200 text-black"
                 }`}
               >
                 {level}
@@ -173,16 +173,10 @@ export default function Home() {
             ))}
           </div>
 
-
-          {/* Contract Summary */}
           {summary && <ContractSummary summary={summary} />}
 
-
-          {/* Risk Summary */}
           <RiskSummary risks={risks} />
 
-
-          {/* Risk Cards */}
           {risks
             .filter((r) => filter === "All" || r.riskLevel === filter)
             .map((risk, index) => (
@@ -193,5 +187,3 @@ export default function Home() {
     </main>
   );
 }
-
-
